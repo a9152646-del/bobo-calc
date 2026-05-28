@@ -206,7 +206,7 @@
 <body>
 
     <div class="container">
-        <h2>分期付款線上試算</h2>
+        <h2>分期試算工具 (全新修正版)</h2>
         
         <div class="input-group">
             <label for="amount">請輸入欲貸款金額 (元)</label>
@@ -240,7 +240,7 @@
     <div id="hidden-screenshot-area"></div>
 
     <script>
-        // 精準調整後的對照組費率資料
+        // 對照組費率資料
         const rates = {
             3:  { aPlus: 0.0399, boboT: 0.0638 },
             6:  { aPlus: 0.0550, boboT: 0.1111 },
@@ -255,7 +255,7 @@
 
         const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
 
-        // 畫面的即時試算核心邏輯 (修正 3/6/9 期少 1 塊的問題)
+        // 畫面的即時試算核心邏輯 (改用 Math.ceil 修正 3/6/9 期少一塊錢問題)
         function calculatePlan() {
             const amountInput = document.getElementById('amount').value;
             const tableBody = document.getElementById('result-table');
@@ -267,7 +267,7 @@
             periods.forEach(p => {
                 const rateData = rates[p];
                 
-                // 改用 Math.ceil (無條件進位) 確保利息分攤不會因為小數點四捨五入而少 1 元
+                // 改用 Math.ceil (無條件進位) 完美吻合對照表金額
                 const aPlusResult = Math.ceil((amount * (1 + rateData.aPlus)) / p);
                 const boboTResult = Math.ceil((amount * (1 + rateData.boboT)) / p);
 
@@ -283,7 +283,7 @@
             });
         }
 
-        // 點擊按鈕後的乾淨圖片輸出邏輯（已移除最下方的注意事項提示文字）
+        // 點擊按鈕後的乾淨圖片輸出邏輯（已完美移除最下方的注意事項提示文字）
         function capturePlan(targetPlan, titleName) {
             const amountInput = document.getElementById('amount').value;
             if (!amountInput || amountInput <= 0) {
@@ -309,7 +309,7 @@
 
             const targetHeaderColor = targetPlan === 'boboT' ? '#f59e0b' : '#10b981';
 
-            // 這裡的 HTML 已經把注意事項整行刪除了
+            // 這裡的 HTML 完全沒有包含注意事項文字
             hiddenArea.innerHTML = `
                 <div id="capture-target" class="screenshot-card">
                     <h3>${titleName}</h3>
