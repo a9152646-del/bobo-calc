@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <style>
         :root {
             --primary-color: #4361ee;
@@ -69,7 +71,7 @@
             font-size: 1.1rem;
             outline: none;
             transition: border-color 0.2s;
-            -webkit-appearance: none; /* 移除 iOS 內建陰影 */
+            -webkit-appearance: none;
         }
 
         input[type="number"]:focus {
@@ -79,6 +81,9 @@
         .table-container {
             overflow-x: auto;
             margin-top: 10px;
+            background: #ffffff;
+            padding: 10px;
+            border-radius: 8px;
         }
 
         table {
@@ -106,18 +111,20 @@
         }
 
         .period-col {
-            color: var(--primary-color);
+            color: #495057;
             font-weight: bold;
         }
 
-        .amount-col {
-            font-weight: 600;
-            color: #10b981;
-        }
-
+        /* BOBO-T 改到左邊 */
         .bobo-col {
             font-weight: 600;
             color: #f59e0b;
+        }
+
+        /* A+ 專案改到右邊 */
+        .amount-col {
+            font-weight: 600;
+            color: #10b981;
         }
 
         .hint {
@@ -126,6 +133,73 @@
             margin-top: 15px;
             text-align: center;
             line-height: 1.4;
+        }
+
+        /* 截圖按鈕樣式 */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .screenshot-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: white;
+            text-align: center;
+        }
+
+        .btn-bobo {
+            background-color: #f59e0b;
+        }
+        .btn-bobo:hover {
+            background-color: #d97706;
+        }
+
+        .btn-aplus {
+            background-color: #10b981;
+        }
+        .btn-aplus:hover {
+            background-color: #059669;
+        }
+
+        /* 隱藏用來截圖的臨時容器 */
+        #hidden-screenshot-area {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+        }
+        
+        .screenshot-card {
+            width: 350px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .screenshot-card h3 {
+            margin-bottom: 15px;
+            color: #2b2d42;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #f1f3f5;
+            padding-bottom: 10px;
+        }
+        .screenshot-card table {
+            width: 100%;
+        }
+        .screenshot-card th {
+            padding: 10px;
+            font-size: 1.05rem;
+        }
+        .screenshot-card td {
+            padding: 12px;
+            font-size: 1.1rem;
         }
     </style>
 </head>
@@ -139,13 +213,13 @@
             <input type="number" id="amount" value="67000" placeholder="例如: 67000" oninput="calculatePlan()">
         </div>
 
-        <div class="table-container">
+        <div class="table-container" id="main-table-area">
             <table>
                 <thead>
                     <tr>
                         <th>專案期數</th>
-                        <th>A+ 專案<br>月付款</th>
                         <th>BOBO-T<br>月付款</th>
+                        <th>A+ 專案<br>月付款</th>
                     </tr>
                 </thead>
                 <tbody id="result-table">
@@ -156,10 +230,17 @@
         <div class="hint">
             * 注意事項：惟詳細調整額度以實際徵審最後核定結果為準。
         </div>
+
+        <div class="btn-group">
+            <button class="screenshot-btn btn-bobo" onclick="capturePlan('boboT', 'BOBO-T 專案分期表')">下載 BOBO-T 截圖</button>
+            <button class="screenshot-btn btn-aplus" onclick="capturePlan('aPlus', 'A+ 專案分期表')">下載 A+ 截圖</button>
+        </div>
     </div>
 
+    <div id="hidden-screenshot-area"></div>
+
     <script>
-        // 設定各期數的總費率 (對照表)
+        // 各期數總費率設定
         const rates = {
             3:  { aPlus: 0.0399, boboT: 0.0638 },
             6:  { aPlus: 0.0550, boboT: 0.1111 },
@@ -169,48 +250,95 @@
             18: { aPlus: 0.1399, boboT: 0.2253 },
             21: { aPlus: 0.1502, boboT: 0.2903 },
             24: { aPlus: 0.1602, boboT: 0.3159 },
-            30: { aPlus: 0.1700, boboT: 0.5200 } // 30期預估費率
+            30: { aPlus: 0.1700, boboT: 0.5200 }
         };
+
+        const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
 
         function calculatePlan() {
             const amountInput = document.getElementById('amount').value;
             const tableBody = document.getElementById('result-table');
-            
-            // 清空舊資料
             tableBody.innerHTML = '';
 
-            // 如果沒輸入金額或小於等於0，就不計算
-            if (!amountInput || amountInput <= 0) {
-                return;
-            }
-
+            if (!amountInput || amountInput <= 0) return;
             const amount = parseFloat(amountInput);
-
-            // 依序計算各個期數
-            const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
 
             periods.forEach(p => {
                 const rateData = rates[p];
-                
-                // 計算 A+ 專案： (金額 * (1 + 費率)) / 期數 -> 四捨五入
                 const aPlusResult = Math.round((amount * (1 + rateData.aPlus)) / p);
-                
-                // 計算 BOBO-T 專案
                 const boboTResult = Math.round((amount * (1 + rateData.boboT)) / p);
 
-                // 產生表格列的 HTML
+                // 欄位對調：BOBO-T 在前，A+ 在後
                 const row = `
                     <tr>
                         <td class="period-col">${p} 期</td>
-                        <td class="amount-col">${aPlusResult.toLocaleString()}</td>
                         <td class="bobo-col">${boboTResult.toLocaleString()}</td>
+                        <td class="amount-col">${aPlusResult.toLocaleString()}</td>
                     </tr>
                 `;
                 tableBody.innerHTML += row;
             });
         }
 
-        // 網頁載入時先自動執行一次預設值 (67000)
+        // 獨立專案截圖邏輯：不包含貸款金額、不包含另一個方案
+        function capturePlan(targetPlan, titleName) {
+            const amountInput = document.getElementById('amount').value;
+            if (!amountInput || amountInput <= 0) {
+                alert('請先輸入有效的貸款金額！');
+                return;
+            }
+            const amount = parseFloat(amountInput);
+            const hiddenArea = document.getElementById('hidden-screenshot-area');
+            
+            // 靜態動態組裝一個「極簡乾淨」的純圖表卡片
+            let tableRowsHTML = '';
+            periods.forEach(p => {
+                const rateData = rates[p];
+                const val = Math.round((amount * (1 + rateData[targetPlan])) / p);
+                const colorClass = targetPlan === 'boboT' ? 'bobo-col' : 'amount-col';
+                
+                tableRowsHTML += `
+                    <tr>
+                        <td class="period-col" style="padding:12px; border-bottom:1px solid #e5e5e5; font-weight:bold;">${p} 期</td>
+                        <td class="${colorClass}" style="padding:12px; border-bottom:1px solid #e5e5e5; font-weight:600; font-size:1.15rem;">${val.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+
+            const targetHeaderColor = targetPlan === 'boboT' ? '#f59e0b' : '#10b981';
+
+            hiddenArea.innerHTML = `
+                <div id="capture-target" class="screenshot-card">
+                    <h3>${titleName}</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="padding:10px; background:#f1f3f5; border-bottom:2px solid #e5e5e5;">專案期數</th>
+                                <th style="padding:10px; background:#f1f3f5; border-bottom:2px solid #e5e5e5; color:${targetHeaderColor};">月付款</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHTML}
+                        </tbody>
+                    </table>
+                    <div style="font-size:0.75rem; color:#868e96; margin-top:15px;">* 惟詳細調整額度以實際徵審最後核定結果為準</div>
+                </div>
+            `;
+
+            // 開始執行圖片渲染與下載
+            const targetEl = document.getElementById('capture-target');
+            html2canvas(targetEl, {
+                scale: 2, // 提高解析度，讓截圖文字不模糊
+                useCORS: true
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `${titleName}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                hiddenArea.innerHTML = ''; // 下載完清空暫存區
+            });
+        }
+
         window.onload = calculatePlan;
     </script>
 </body>
