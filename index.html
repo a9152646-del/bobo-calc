@@ -240,7 +240,7 @@
     <div id="hidden-screenshot-area"></div>
 
     <script>
-        // 對照組費率資料
+        // 精準調整後的對照組費率資料
         const rates = {
             3:  { aPlus: 0.0399, boboT: 0.0638 },
             6:  { aPlus: 0.0550, boboT: 0.1111 },
@@ -255,7 +255,7 @@
 
         const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
 
-        // 畫面的即時試算核心邏輯
+        // 畫面的即時試算核心邏輯 (修正 3/6/9 期少 1 塊的問題)
         function calculatePlan() {
             const amountInput = document.getElementById('amount').value;
             const tableBody = document.getElementById('result-table');
@@ -266,8 +266,10 @@
 
             periods.forEach(p => {
                 const rateData = rates[p];
-                const aPlusResult = Math.round((amount * (1 + rateData.aPlus)) / p);
-                const boboTResult = Math.round((amount * (1 + rateData.boboT)) / p);
+                
+                // 改用 Math.ceil (無條件進位) 確保利息分攤不會因為小數點四捨五入而少 1 元
+                const aPlusResult = Math.ceil((amount * (1 + rateData.aPlus)) / p);
+                const boboTResult = Math.ceil((amount * (1 + rateData.boboT)) / p);
 
                 // 結構順序：期數 -> BOBO-T -> A+
                 const row = `
@@ -281,7 +283,7 @@
             });
         }
 
-        // 點擊按鈕後的乾淨圖片輸出邏輯（會隱藏頂部金額與非選定方案）
+        // 點擊按鈕後的乾淨圖片輸出邏輯（已移除最下方的注意事項提示文字）
         function capturePlan(targetPlan, titleName) {
             const amountInput = document.getElementById('amount').value;
             if (!amountInput || amountInput <= 0) {
@@ -294,7 +296,7 @@
             let tableRowsHTML = '';
             periods.forEach(p => {
                 const rateData = rates[p];
-                const val = Math.round((amount * (1 + rateData[targetPlan])) / p);
+                const val = Math.ceil((amount * (1 + rateData[targetPlan])) / p);
                 const colorClass = targetPlan === 'boboT' ? 'bobo-col' : 'amount-col';
                 
                 tableRowsHTML += `
@@ -307,6 +309,7 @@
 
             const targetHeaderColor = targetPlan === 'boboT' ? '#f59e0b' : '#10b981';
 
+            // 這裡的 HTML 已經把注意事項整行刪除了
             hiddenArea.innerHTML = `
                 <div id="capture-target" class="screenshot-card">
                     <h3>${titleName}</h3>
@@ -321,7 +324,6 @@
                             ${tableRowsHTML}
                         </tbody>
                     </table>
-                    <div style="font-size:0.75rem; color:#868e96; margin-top:15px;">* 惟詳細調整額度以實際徵審最後核定結果為準</div>
                 </div>
             `;
 
