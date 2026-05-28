@@ -115,13 +115,13 @@
             font-weight: bold;
         }
 
-        /* BOBO-T 改到左邊 */
+        /* BOBO-T 在左邊 */
         .bobo-col {
             font-weight: 600;
             color: #f59e0b;
         }
 
-        /* A+ 專案改到右邊 */
+        /* A+ 專案在右邊 */
         .amount-col {
             font-weight: 600;
             color: #10b981;
@@ -169,7 +169,7 @@
             background-color: #059669;
         }
 
-        /* 隱藏用來截圖的臨時容器 */
+        /* 隱藏用來產製截圖的臨時區塊 */
         #hidden-screenshot-area {
             position: absolute;
             left: -9999px;
@@ -240,7 +240,7 @@
     <div id="hidden-screenshot-area"></div>
 
     <script>
-        // 各期數總費率設定
+        // 對照組費率資料
         const rates = {
             3:  { aPlus: 0.0399, boboT: 0.0638 },
             6:  { aPlus: 0.0550, boboT: 0.1111 },
@@ -255,6 +255,7 @@
 
         const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
 
+        // 畫面的即時試算核心邏輯
         function calculatePlan() {
             const amountInput = document.getElementById('amount').value;
             const tableBody = document.getElementById('result-table');
@@ -268,7 +269,7 @@
                 const aPlusResult = Math.round((amount * (1 + rateData.aPlus)) / p);
                 const boboTResult = Math.round((amount * (1 + rateData.boboT)) / p);
 
-                // 欄位對調：BOBO-T 在前，A+ 在後
+                // 結構順序：期數 -> BOBO-T -> A+
                 const row = `
                     <tr>
                         <td class="period-col">${p} 期</td>
@@ -280,7 +281,7 @@
             });
         }
 
-        // 獨立專案截圖邏輯：不包含貸款金額、不包含另一個方案
+        // 點擊按鈕後的乾淨圖片輸出邏輯（會隱藏頂部金額與非選定方案）
         function capturePlan(targetPlan, titleName) {
             const amountInput = document.getElementById('amount').value;
             if (!amountInput || amountInput <= 0) {
@@ -290,7 +291,6 @@
             const amount = parseFloat(amountInput);
             const hiddenArea = document.getElementById('hidden-screenshot-area');
             
-            // 靜態動態組裝一個「極簡乾淨」的純圖表卡片
             let tableRowsHTML = '';
             periods.forEach(p => {
                 const rateData = rates[p];
@@ -325,17 +325,17 @@
                 </div>
             `;
 
-            // 開始執行圖片渲染與下載
+            // 將暫存的乾淨 HTML 轉換成 PNG 並觸發下載
             const targetEl = document.getElementById('capture-target');
             html2canvas(targetEl, {
-                scale: 2, // 提高解析度，讓截圖文字不模糊
+                scale: 2, 
                 useCORS: true
             }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `${titleName}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
-                hiddenArea.innerHTML = ''; // 下載完清空暫存區
+                hiddenArea.innerHTML = ''; 
             });
         }
 
