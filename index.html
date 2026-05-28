@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>分期付款金額試算</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #2b2d42;
+            --border-color: #e5e5e5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            margin-top: 10px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            color: var(--text-color);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1.1rem;
+            outline: none;
+            transition: border-color 0.2s;
+            -webkit-appearance: none; /* 移除 iOS 內建陰影 */
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        th {
+            background-color: #f1f3f5;
+            color: #495057;
+            font-weight: 600;
+            padding: 12px 8px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .period-col {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+
+        .amount-col {
+            font-weight: 600;
+            color: #10b981;
+        }
+
+        .bobo-col {
+            font-weight: 600;
+            color: #f59e0b;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #868e96;
+            margin-top: 15px;
+            text-align: center;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>分期付款線上試算</h2>
+        
+        <div class="input-group">
+            <label for="amount">請輸入欲貸款金額 (元)</label>
+            <input type="number" id="amount" value="67000" placeholder="例如: 67000" oninput="calculatePlan()">
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>專案期數</th>
+                        <th>A+ 專案<br>月付款</th>
+                        <th>BOBO-T<br>月付款</th>
+                    </tr>
+                </thead>
+                <tbody id="result-table">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="hint">
+            * 注意事項：惟詳細調整額度以實際徵審最後核定結果為準。
+        </div>
+    </div>
+
+    <script>
+        // 設定各期數的總費率 (對照表)
+        const rates = {
+            3:  { aPlus: 0.0399, boboT: 0.0638 },
+            6:  { aPlus: 0.0550, boboT: 0.1111 },
+            9:  { aPlus: 0.0799, boboT: 0.1111 },
+            12: { aPlus: 0.1001, boboT: 0.1697 },
+            15: { aPlus: 0.1201, boboT: 0.1977 },
+            18: { aPlus: 0.1399, boboT: 0.2253 },
+            21: { aPlus: 0.1502, boboT: 0.2903 },
+            24: { aPlus: 0.1602, boboT: 0.3159 },
+            30: { aPlus: 0.1700, boboT: 0.5200 } // 30期預估費率
+        };
+
+        function calculatePlan() {
+            const amountInput = document.getElementById('amount').value;
+            const tableBody = document.getElementById('result-table');
+            
+            // 清空舊資料
+            tableBody.innerHTML = '';
+
+            // 如果沒輸入金額或小於等於0，就不計算
+            if (!amountInput || amountInput <= 0) {
+                return;
+            }
+
+            const amount = parseFloat(amountInput);
+
+            // 依序計算各個期數
+            const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
+
+            periods.forEach(p => {
+                const rateData = rates[p];
+                
+                // 計算 A+ 專案： (金額 * (1 + 費率)) / 期數 -> 四捨五入
+                const aPlusResult = Math.round((amount * (1 + rateData.aPlus)) / p);
+                
+                // 計算 BOBO-T 專案
+                const boboTResult = Math.round((amount * (1 + rateData.boboT)) / p);
+
+                // 產生表格列的 HTML
+                const row = `
+                    <tr>
+                        <td class="period-col">${p} 期</td>
+                        <td class="amount-col">${aPlusResult.toLocaleString()}</td>
+                        <td class="bobo-col">${boboTResult.toLocaleString()}</td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        }
+
+        // 網頁載入時先自動執行一次預設值 (67000)
+        window.onload = calculatePlan;
+    </script>
+</body>
+</html>
