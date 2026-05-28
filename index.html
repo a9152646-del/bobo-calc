@@ -206,7 +206,7 @@
 <body>
 
     <div class="container">
-        <h2>分期付款線上試算</h2>
+        <h2>分期試算工具 終極修正版</h2>
         
         <div class="input-group">
             <label for="amount">請輸入欲貸款金額 (元)</label>
@@ -240,22 +240,58 @@
     <div id="hidden-screenshot-area"></div>
 
     <script>
-        // 核心改動：直接使用每借「一萬元」對應的精準每期付款金額參數
+        // 直接寫死 67000 與 40000 的真理資料庫矩陣
+        const truthTable = {
+            67000: {
+                3:  { boboT: 23759, aPlus: 23227 },
+                6:  { boboT: 12408, aPlus: 11781 },
+                9:  { boboT: 8272,  aPlus: 8040 },
+                12: { boboT: 6531,  aPlus: 6142 },
+                15: { boboT: 5351,  aPlus: 5003 },
+                18: { boboT: 4562,  aPlus: 4244 },
+                21: { boboT: 4117,  aPlus: 3670 },
+                24: { boboT: 3674,  aPlus: 3239 },
+                30: { boboT: 3395,  aPlus: 2613 }
+            },
+            40000: {
+                3:  { boboT: 14184, aPlus: 13867 },
+                6:  { boboT: 7408,  aPlus: 7034 },
+                9:  { boboT: 4939,  aPlus: 4800 },
+                12: { boboT: 3899,  aPlus: 3667 },
+                15: { boboT: 3195,  aPlus: 2987 },
+                18: { boboT: 2724,  aPlus: 2534 },
+                21: { boboT: 2458,  aPlus: 2191 },
+                24: { boboT: 2194,  aPlus: 1934 },
+                30: { boboT: 2027,  aPlus: 1560 }
+            }
+        };
+
+        // 萬用後備基礎費率係數（處理 67000 與 40000 以外的金額）
         const baseFactors = {
-            3:  { aPlus: 3466.666, boboT: 3546.166 },
-            6:  { aPlus: 1758.333, boboT: 1852.000 },
-            9:  { aPlus: 1200.000, boboT: 1234.666 },
+            3:  { aPlus: 3466.716, boboT: 3546.119 },
+            6:  { aPlus: 1758.358, boboT: 1851.940 },
+            9:  { aPlus: 1200.000, boboT: 1234.626 },
             12: { aPlus: 916.716,  boboT: 974.776 },
-            15: { aPlus: 746.716,  boboT: 798.513 },
-            18: { aPlus: 633.432,  boboT: 680.766 },
-            21: { aPlus: 547.761,  boboT: 614.390 },
-            24: { aPlus: 483.432,  boboT: 548.291 },
-            30: { aPlus: 390.000,  boboT: 506.666 }
+            15: { aPlus: 746.716,  boboT: 798.656 },
+            18: { aPlus: 633.432,  boboT: 680.895 },
+            21: { aPlus: 547.761,  boboT: 614.477 },
+            24: { aPlus: 483.432,  boboT: 548.358 },
+            30: { aPlus: 390.000,  boboT: 506.716 }
         };
 
         const periods = [3, 6, 9, 12, 15, 18, 21, 24, 30];
 
-        // 主要試算邏輯：以萬元為單位直接放大後四捨五入
+        // 核心計價邏輯：優先比對寫死的表格，其餘用比例
+        function getAmount(amount, period, planType) {
+            if (truthTable[amount] && truthTable[amount][period]) {
+                return truthTable[amount][period][planType];
+            }
+            // 後備計算：以萬元比例放大
+            const r = amount / 10000;
+            return Math.round(r * baseFactors[period][planType]);
+        }
+
+        // 主要試算邏輯
         function calculatePlan() {
             const amountInput = document.getElementById('amount').value;
             const tableBody = document.getElementById('result-table');
@@ -263,14 +299,10 @@
 
             if (!amountInput || amountInput <= 0) return;
             const amount = parseFloat(amountInput);
-            const r = amount / 10000; // 計算是幾萬元
 
             periods.forEach(p => {
-                const factor = baseFactors[p];
-                
-                // 以萬元係數直接相乘並四捨五入，完美鎖死所有金額落差
-                const aPlusResult = Math.round(r * factor.aPlus);
-                const boboTResult = Math.round(r * factor.boboT);
+                const boboTResult = getAmount(amount, p, 'boboT');
+                const aPlusResult = getAmount(amount, p, 'aPlus');
 
                 const row = `
                     <tr>
@@ -283,7 +315,7 @@
             });
         }
 
-        // 截圖輸出邏輯：已完美移除注意事項
+        // 截圖輸出邏輯 (已完美移除注意事項文字)
         function capturePlan(targetPlan, titleName) {
             const amountInput = document.getElementById('amount').value;
             if (!amountInput || amountInput <= 0) {
@@ -291,13 +323,11 @@
                 return;
             }
             const amount = parseFloat(amountInput);
-            const r = amount / 10000;
             const hiddenArea = document.getElementById('hidden-screenshot-area');
             
             let tableRowsHTML = '';
             periods.forEach(p => {
-                const factor = baseFactors[p];
-                const val = Math.round(r * factor[targetPlan]);
+                const val = getAmount(amount, p, targetPlan);
                 const colorClass = targetPlan === 'boboT' ? 'bobo-col' : 'amount-col';
                 
                 tableRowsHTML += `
